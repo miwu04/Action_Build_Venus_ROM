@@ -331,6 +331,9 @@ sudo cp -r "$GITHUB_WORKSPACE"/"${device}"/* "$GITHUB_WORKSPACE"/images
 sudo rm -rf "$GITHUB_WORKSPACE"/"${device}"
 sudo rm -rf "$GITHUB_WORKSPACE"/"${device}"_files
 End_Time 功能修复
+# 修复 Mi Beam
+echo -e "${Red}- 修复 Mi Beam"
+sudo cp "$GITHUB_WORKSPACE"/"${device}"_files/android.hardware.nfc.beam.xml "$GITHUB_WORKSPACE"/images/vendor/etc/permissions/android.hardware.nfc.beam.xml
 ### 功能修复结束
 
 ### 生成 super.img
