@@ -9,7 +9,7 @@ VENDOR_URL="$2"       # 底包下载地址
 GITHUB_ENV="$3"       # 输出环境变量
 GITHUB_WORKSPACE="$4" # 工作目录
 
-device=houji # 设备代号
+device=venus # 设备代号
 
 Red='\033[1;31m'    # 粗体红色
 Yellow='\033[1;33m' # 粗体黄色
@@ -21,7 +21,7 @@ port_version=$(echo ${port_os_version} | sed 's/OS1/V816/g')     # 移植包的�
 port_zip_name=$(echo ${URL} | cut -d"/" -f5)                     # 移植包的 zip 名称, 例: miui_AURORA_OS1.0.7.0.UNACNXM_81a48e3c20_14.0.zip
 vendor_os_version=$(echo ${VENDOR_URL} | cut -d"/" -f4)          # 底包的 OS 版本号, 例: OS1.0.32.0.UNCCNXM
 vendor_version=$(echo ${vendor_os_version} | sed 's/OS1/V816/g') # 底包的实际版本号, 例: V816.0.32.0.UNCCNXM
-vendor_zip_name=$(echo ${VENDOR_URL} | cut -d"/" -f5)            # 底包的 zip 名称, 例: miui_HOUJI_OS1.0.32.0.UNCCNXM_4fd0e15877_14.0.zip
+vendor_zip_name=$(echo ${VENDOR_URL} | cut -d"/" -f5)            # 底包的 zip 名称, 例: miui_VENUS_OS1.0.32.0.UNCCNXM_4fd0e15877_14.0.zip
 
 android_version=$(echo ${URL} | cut -d"_" -f5 | cut -d"." -f1) # Android 版本号, 例: 14
 build_time=$(date) && build_utc=$(date -d "$build_time" +%s)   # 构建时间
@@ -107,7 +107,7 @@ echo -e "${Red}- 开始解底包payload"
 $payload_extract -s -o "$GITHUB_WORKSPACE"/Extra_dir/ -i "$GITHUB_WORKSPACE"/"${device}"/payload.bin -X system,system_ext,product -e -T0
 sudo rm -rf "$GITHUB_WORKSPACE"/"${device}"/payload.bin
 echo -e "${Red}- 开始分解底包image"
-for i in mi_ext odm system_dlkm vendor vendor_dlkm; do
+for i in mi_ext odm vendor; do
   echo -e "${Yellow}- 正在分解底包: $i.img"
   cd "$GITHUB_WORKSPACE"/"${device}"
   sudo $erofs_extract -s -i "$GITHUB_WORKSPACE"/Extra_dir/$i.img -x
@@ -161,14 +161,10 @@ echo "vendor_base_line=$vendor_base_line" >>$GITHUB_ENV
 ### 功能修复
 echo -e "${Red}- 开始功能修复"
 Start_Time
-# 添加 KernelSU 支持 (可选择)
-echo -e "${Red}- 添加 KernelSU 支持 (可选择)"
-mkdir -p "$GITHUB_WORKSPACE"/init_boot
-cd "$GITHUB_WORKSPACE"/init_boot
-cp -f "$GITHUB_WORKSPACE"/"${device}"/firmware-update/init_boot.img "$GITHUB_WORKSPACE"/init_boot
-$ksud boot-patch -b "$GITHUB_WORKSPACE"/init_boot/init_boot.img --magiskboot $magiskboot --kmi android14-6.1
-mv -f "$GITHUB_WORKSPACE"/init_boot/kernelsu_*.img "$GITHUB_WORKSPACE"/"${device}"/firmware-update/init_boot-kernelsu.img
-rm -rf "$GITHUB_WORKSPACE"/init_boot
+# 去除 AVB2.0 校验
+echo -e "\e[1;31m - 去除 AVB2.0 校验 \e[0m"
+"$GITHUB_WORKSPACE"/tools/vbmeta-disable-verification "$GITHUB_WORKSPACE"/"${device}"/firmware-update/vbmeta.img
+"$GITHUB_WORKSPACE"/tools/vbmeta-disable-verification "$GITHUB_WORKSPACE"/"${device}"/firmware-update/vbmeta_system.img
 # 替换 vendor_boot 的 fstab
 echo -e "${Red}- 替换 Vendor Boot 的 fstab"
 mkdir -p "$GITHUB_WORKSPACE"/vendor_boot
@@ -215,6 +211,7 @@ sudo cp -f "$GITHUB_WORKSPACE"/"${device}"_files/fstab.qcom "$GITHUB_WORKSPACE"/
 # 替换 Product 的叠加层
 echo -e "${Red}- 替换 product 的叠加层"
 sudo rm -rf "$GITHUB_WORKSPACE"/images/product/overlay/*
+sudo cat "$GITHUB_WORKSPACE"/"${device}"_files/overlay.zip.1 "$GITHUB_WORKSPACE"/"${device}"_files/overlay.zip.2 >"$GITHUB_WORKSPACE"/"${device}"_files/overlay.zip
 sudo unzip -o -q "$GITHUB_WORKSPACE"/"${device}"_files/overlay.zip -d "$GITHUB_WORKSPACE"/images/product/overlay
 # 替换 device_features 文件
 echo -e "${Red}- 替换 device_features 文件"
@@ -224,7 +221,7 @@ sudo unzip -o -q "$GITHUB_WORKSPACE"/"${device}"_files/device_features.zip -d "$
 echo -e "${Red}- 替换 displayconfig 文件"
 sudo rm -rf "$GITHUB_WORKSPACE"/images/product/etc/displayconfig/*
 sudo unzip -o -q "$GITHUB_WORKSPACE"/"${device}"_files/displayconfig.zip -d "$GITHUB_WORKSPACE"/images/product/etc/displayconfig/
-# 修复精准电量 (亮屏可用时长)
+# 修复精准电量 (亮屏可用时长) WIP
 echo -e "${Red}- 修复精准电量 (亮屏可用时长)"
 sudo rm -rf "$GITHUB_WORKSPACE"/images/system/system/app/PowerKeeper/*
 sudo unzip -o -q "$GITHUB_WORKSPACE"/"${device}"_files/PowerKeeper.zip -d "$GITHUB_WORKSPACE"/images/system/system/app/PowerKeeper/
@@ -235,7 +232,7 @@ mkdir "$GITHUB_WORKSPACE"/images/product/app/MiAONService
 sudo cp "$GITHUB_WORKSPACE"/"${device}"_files/MiAONService.apk "$GITHUB_WORKSPACE"/images/product/app/MiAONService
 # 统一 build.prop
 echo -e "${Red}- 统一 build.prop"
-sudo sed -i 's/ro.build.user=[^*]*/ro.build.user=YuKongA/' "$GITHUB_WORKSPACE"/images/system/system/build.prop
+sudo sed -i 's/ro.build.user=[^*]*/ro.build.user=miwu04/' "$GITHUB_WORKSPACE"/images/system/system/build.prop
 for port_build_prop in $(sudo find "$GITHUB_WORKSPACE"/images/ -type f -name "build.prop"); do
   sudo sed -i 's/build.date=[^*]*/build.date='"${build_time}"'/' "${port_build_prop}"
   sudo sed -i 's/build.date.utc=[^*]*/build.date.utc='"${build_utc}"'/' "${port_build_prop}"
@@ -261,11 +258,11 @@ for app in "${apps[@]}"; do
 done
 # 分辨率修改
 echo -e "${Red}- 分辨率修改"
-sudo sed -i 's/persist.miui.density_v2=[^*]*/persist.miui.density_v2=480/' "$GITHUB_WORKSPACE"/images/product/etc/build.prop
+sudo sed -i 's/persist.miui.density_v2=[^*]*/persist.miui.density_v2=560/' "$GITHUB_WORKSPACE"/images/product/etc/build.prop
 # 替换相机
 echo -e "${Red}- 替换相机"
 sudo rm -rf "$GITHUB_WORKSPACE"/images/product/priv-app/MiuiCamera/*
-sudo cat "$GITHUB_WORKSPACE"/"${device}"_files/MiuiCamera.apk.1 "$GITHUB_WORKSPACE"/"${device}"_files/MiuiCamera.apk.2 "$GITHUB_WORKSPACE"/"${device}"_files/MiuiCamera.apk.3 >"$GITHUB_WORKSPACE"/"${device}"_files/MiuiCamera.apk
+sudo cat "$GITHUB_WORKSPACE"/"${device}"_files/MiuiCamera.apk.1 "$GITHUB_WORKSPACE"/"${device}"_files/MiuiCamera.apk.2 >"$GITHUB_WORKSPACE"/"${device}"_files/MiuiCamera.apk
 sudo cp -f "$GITHUB_WORKSPACE"/"${device}"_files/MiuiCamera.apk "$GITHUB_WORKSPACE"/images/product/priv-app/MiuiCamera/
 # 替换相机标定
 echo -e "${Red}- 替换相机标定"
@@ -307,9 +304,6 @@ sudo rm -rf "$GITHUB_WORKSPACE"/"${device}"/vendor/bin/install-recovery.sh
 # 修复 init 崩溃
 echo -e "${Red}- 修复 init 崩溃"
 sudo sed -i "/start qti-testscripts/d" "$GITHUB_WORKSPACE"/"${device}"/vendor/etc/init/hw/init.qcom.rc
-# 内置 TWRP
-echo -e "${Red}- 内置 TWRP"
-sudo unzip -o -q "$GITHUB_WORKSPACE"/"${device}"_files/recovery.zip -d "$GITHUB_WORKSPACE"/"${device}"/firmware-update/
 # 添加刷机脚本
 echo -e "${Red}- 添加刷机脚本"
 sudo unzip -o -q "$GITHUB_WORKSPACE"/tools/flashtools.zip -d "$GITHUB_WORKSPACE"/images
@@ -342,7 +336,7 @@ End_Time 功能修复
 ### 生成 super.img
 echo -e "${Red}- 开始打包super.img"
 Start_Time
-partitions=("mi_ext" "odm" "product" "system" "system_ext" "system_dlkm" "vendor" "vendor_dlkm")
+partitions=("mi_ext" "odm" "product" "system" "system_ext" "vendor")
 for partition in "${partitions[@]}"; do
   echo -e "${Red}- 正在生成: $partition"
   sudo python3 "$GITHUB_WORKSPACE"/tools/fspatch.py "$GITHUB_WORKSPACE"/images/$partition "$GITHUB_WORKSPACE"/images/config/"$partition"_fs_config
@@ -352,9 +346,9 @@ for partition in "${partitions[@]}"; do
   sudo rm -rf "$GITHUB_WORKSPACE"/images/$partition
 done
 sudo rm -rf "$GITHUB_WORKSPACE"/images/config
-$lpmake --metadata-size 65536 --super-name super --block-size 4096 --partition mi_ext_a:readonly:"$mi_ext_size":qti_dynamic_partitions_a --image mi_ext_a="$GITHUB_WORKSPACE"/images/mi_ext.img --partition mi_ext_b:readonly:0:qti_dynamic_partitions_b --partition odm_a:readonly:"$odm_size":qti_dynamic_partitions_a --image odm_a="$GITHUB_WORKSPACE"/images/odm.img --partition odm_b:readonly:0:qti_dynamic_partitions_b --partition product_a:readonly:"$product_size":qti_dynamic_partitions_a --image product_a="$GITHUB_WORKSPACE"/images/product.img --partition product_b:readonly:0:qti_dynamic_partitions_b --partition system_a:readonly:"$system_size":qti_dynamic_partitions_a --image system_a="$GITHUB_WORKSPACE"/images/system.img --partition system_b:readonly:0:qti_dynamic_partitions_b --partition system_ext_a:readonly:"$system_ext_size":qti_dynamic_partitions_a --image system_ext_a="$GITHUB_WORKSPACE"/images/system_ext.img --partition system_ext_b:readonly:0:qti_dynamic_partitions_b --partition system_dlkm_a:readonly:"$system_dlkm_size":qti_dynamic_partitions_a --image system_dlkm_a="$GITHUB_WORKSPACE"/images/system_dlkm.img --partition system_dlkm_b:readonly:0:qti_dynamic_partitions_b --partition vendor_a:readonly:"$vendor_size":qti_dynamic_partitions_a --image vendor_a="$GITHUB_WORKSPACE"/images/vendor.img --partition vendor_b:readonly:0:qti_dynamic_partitions_b --partition vendor_dlkm_a:readonly:"$vendor_dlkm_size":qti_dynamic_partitions_a --image vendor_dlkm_a="$GITHUB_WORKSPACE"/images/vendor_dlkm.img --partition vendor_dlkm_b:readonly:0:qti_dynamic_partitions_b --device super:8321499136 --metadata-slots 3 --group qti_dynamic_partitions_a:8321499136 --group qti_dynamic_partitions_b:8321499136 --virtual-ab -F --output "$GITHUB_WORKSPACE"/images/super.img
+$lpmake --metadata-size 65536 --super-name super --block-size 4096 --partition mi_ext_a:readonly:"$mi_ext_size":qti_dynamic_partitions_a --image mi_ext_a="$GITHUB_WORKSPACE"/images/mi_ext.img --partition mi_ext_b:readonly:0:qti_dynamic_partitions_b --partition odm_a:readonly:"$odm_size":qti_dynamic_partitions_a --image odm_a="$GITHUB_WORKSPACE"/images/odm.img --partition odm_b:readonly:0:qti_dynamic_partitions_b --partition product_a:readonly:"$product_size":qti_dynamic_partitions_a --image product_a="$GITHUB_WORKSPACE"/images/product.img --partition product_b:readonly:0:qti_dynamic_partitions_b --partition system_a:readonly:"$system_size":qti_dynamic_partitions_a --image system_a="$GITHUB_WORKSPACE"/images/system.img --partition system_b:readonly:0:qti_dynamic_partitions_b --partition system_ext_a:readonly:"$system_ext_size":qti_dynamic_partitions_a --image system_ext_a="$GITHUB_WORKSPACE"/images/system_ext.img --partition system_ext_b:readonly:0:qti_dynamic_partitions_b --partition vendor_a:readonly:"$vendor_size":qti_dynamic_partitions_a --image vendor_a="$GITHUB_WORKSPACE"/images/vendor.img --partition vendor_b:readonly:0:qti_dynamic_partitions_b --device super:9126805504 --metadata-slots 3 --group qti_dynamic_partitions_a:9126805504 --group qti_dynamic_partitions_b:9126805504 --virtual-ab -F --output "$GITHUB_WORKSPACE"/images/super.img
 End_Time 打包super
-for i in mi_ext odm product system system_ext system_dlkm vendor vendor_dlkm; do
+for i in mi_ext odm product system system_ext  vendor ; do
   rm -rf "$GITHUB_WORKSPACE"/images/$i.img
 done
 ### 生成 super.img 结束
@@ -377,7 +371,7 @@ echo -e "${Red}- 定制 ROM 包名"
 md5=$(md5sum "$GITHUB_WORKSPACE"/zip/miui_${device}_${port_os_version}.zip)
 echo "MD5=${md5:0:32}" >>$GITHUB_ENV
 zip_md5=${md5:0:10}
-rom_name="miui_HOUJI_${port_os_version}_${zip_md5}_${android_version}.0_YuKongA.zip"
+rom_name="miui_VENUS_${port_os_version}_${zip_md5}_${android_version}.0_miwu04.zip"
 sudo mv "$GITHUB_WORKSPACE"/zip/miui_${device}_${port_os_version}.zip "$GITHUB_WORKSPACE"/zip/"${rom_name}"
 echo "rom_name=$rom_name" >>$GITHUB_ENV
 ### 输出卡刷包结束
