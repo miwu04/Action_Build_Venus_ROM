@@ -185,8 +185,9 @@ if [ -f ramdisk.cpio ]; then
   cd ramdisk
   EXTRACT_UNSAFE_SYMLINKS=1 cpio -d -F ../ramdisk.cpio -i 2>&1
 fi
-sudo cp -f "$GITHUB_WORKSPACE"/"${device}"_files/fstab.qcom "$GITHUB_WORKSPACE"/vendor_boot/ramdisk/first_stage_ramdisk/fstab.qcom
-sudo chmod 644 "$GITHUB_WORKSPACE"/vendor_boot/ramdisk/first_stage_ramdisk/fstab.qcom
+sudo rm -rf "$GITHUB_WORKSPACE"/vendor_boot/ramdisk/first_stage_ramdisk/fstab.qcom
+sudo cp -f "$GITHUB_WORKSPACE"/"${device}"_files/fstab.default "$GITHUB_WORKSPACE"/vendor_boot/ramdisk/first_stage_ramdisk/fstab.default
+sudo chmod 644 "$GITHUB_WORKSPACE"/vendor_boot/ramdisk/first_stage_ramdisk/fstab.default
 cd "$GITHUB_WORKSPACE"/vendor_boot/ramdisk/
 find | sed 1d | cpio -H newc -R 0:0 -o -F ../ramdisk_new.cpio
 cd ..
@@ -207,7 +208,8 @@ fi
 sudo rm -rf "$GITHUB_WORKSPACE"/vendor_boot
 # 替换 vendor 的 fstab
 echo -e "${Red}- 替换 vendor 的 fstab"
-sudo cp -f "$GITHUB_WORKSPACE"/"${device}"_files/fstab.qcom "$GITHUB_WORKSPACE"/"${device}"/vendor/etc/fstab.qcom
+sudo rm -rf "$GITHUB_WORKSPACE"/"${device}"/vendor/etc/fstab.qcom
+sudo cp -f "$GITHUB_WORKSPACE"/"${device}"_files/fstab.default "$GITHUB_WORKSPACE"/"${device}"/vendor/etc/fstab.default
 # 替换 Product 的叠加层
 echo -e "${Red}- 替换 product 的叠加层"
 sudo rm -rf "$GITHUB_WORKSPACE"/images/product/overlay/*
